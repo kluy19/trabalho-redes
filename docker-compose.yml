@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  prog1:
+    build: ./p1
+    container_name: prog1
+    stdin_open: true
+    tty: true
+    ports:
+      - "5000:5000" # você pode mapear conforme seu programa usar (p1 usa 6000? ajuste)
+    networks:
+      - trabalho-rede
+
+  prog2:
+    build: ./p2
+    container_name: prog2
+    stdin_open: true
+    tty: true
+    ports:
+      - "6000:6000"
+    networks:
+      - trabalho-rede
+
+  prog3:
+    build: ./p3
+    container_name: prog3
+    stdin_open: true
+    tty: true
+    ports:
+      - "7000:7000"
+    networks:
+      - trabalho-rede
+
+networks:
+  trabalho-rede:
+    driver: bridge
