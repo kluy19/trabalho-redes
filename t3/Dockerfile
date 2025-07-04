@@ -4,4 +4,6 @@ WORKDIR /app
 
 COPY p3.py .
 
+RUN pip install numpy
+
 CMD ["python", "p3.py"]

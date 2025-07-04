@@ -1,67 +1,81 @@
 import socket
 import pickle
+import struct
 import numpy as np
 import time
 
+def processar_matriz(matriz):
+    matriz_transposta = np.transpose(matriz)
+    determinante = np.linalg.det(matriz)
+    return matriz_transposta, determinante
+
+def receber_dados(sock):
+    tamanho_pacote = sock.recv(8)
+    if not tamanho_pacote:
+        return None
+    tamanho = struct.unpack('!Q', tamanho_pacote)[0]
+
+    pacote = b''
+    while len(pacote) < tamanho:
+        parte = sock.recv(min(4096, tamanho - len(pacote)))
+        if not parte:
+            raise ConnectionError("Conexão interrompida.")
+        pacote += parte
+
+    return pickle.loads(pacote)
+
+def enviar_dados(sock, dados):
+    pacote = pickle.dumps(dados)
+    tamanho = struct.pack('!Q', len(pacote))
+    sock.sendall(tamanho)
+    sock.sendall(pacote)
+
 def main():
     print("=== Prog2: Recebe matriz, processa e envia resultado ===")
-
-    host_p1 = input("Digite o IP do programa 1 (origem das matrizes): ").strip()
-    port_p1 = 6000
-
-    host_p3 = input("Digite o IP do programa 3 (destino do resultado): ").strip()
+    host_p3 = input("Digite o IP do programa 3 (destino): ").strip()
     port_p3 = 7000
+    port_p2 = 6000
 
-    # Cria socket para ouvir prog1
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_p1:
-        s_p1.bind(('', port_p1))
-        s_p1.listen()
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_p3:
+                s_p3.connect((host_p3, port_p3))
+                print(f"Conectado ao programa 3 em {host_p3}:{port_p3}")
 
-        print(f"Prog2: aguardando matrizes do prog1 na porta {port_p1}...")
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_p2:
+                    s_p2.bind(('', port_p2))
+                    s_p2.listen(1)
+                    print("Prog2: aguardando matrizes de prog1...")
 
-        while True:
-            conn, addr = s_p1.accept()
-            with conn:
-                print(f"Conexão recebida de {addr}")
-                dados_serializados = b''
-                while True:
-                    parte = conn.recv(4096)
-                    if not parte:
-                        break
-                    dados_serializados += parte
+                    conn, addr = s_p2.accept()
+                    with conn:
+                        print(f"Prog2: conexão recebida de {addr}")
+                        while True:
+                            dados = receber_dados(conn)
+                            if dados is None:
+                                break
 
-                dados = pickle.loads(dados_serializados)
-                indice = dados['indice']
-                matriz = dados['matriz']
-                timestamp_envio = dados['timestamp']
+                            indice = dados['indice']
+                            matriz = dados['matriz']
+                            start_time = dados['start_time']
 
-                print(f"Matriz #{indice} recebida de prog1:\n{matriz}")
+                            print(f"\nMatriz #{indice} recebida. Processando...")
 
-                # Inverte a matriz (transposição)
-                matriz_invertida = np.transpose(matriz)
-                print(f"Matriz #{indice} invertida:\n{matriz_invertida}")
+                            transposta, determinante = processar_matriz(matriz)
 
-                # Calcula determinante
-                det = np.linalg.det(matriz_invertida)
-                print(f"Determinante da matriz #{indice}: {det}")
+                            resultado = {
+                                'indice': indice,
+                                'determinante': determinante,
+                                'start_time': start_time  # repassa para p3 calcular tempo total
+                            }
 
-                # Prepara dados para enviar ao p3
-                resultado = {
-                    'indice': indice,
-                    'determinante': det,
-                    'timestamp_envio': timestamp_envio,
-                    'timestamp_proc': time.time()
-                }
+                            enviar_dados(s_p3, resultado)
+                            print(f"Resultado da matriz #{indice} enviado para prog3.")
 
-                # Envia para p3
-                try:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_p3:
-                        s_p3.connect((host_p3, port_p3))
-                        dados_serializados = pickle.dumps(resultado)
-                        s_p3.sendall(dados_serializados)
-                        print(f"Resultado da matriz #{indice} enviado para prog3")
-                except Exception as e:
-                    print(f"Erro ao enviar resultado para prog3: {e}")
+        except Exception as e:
+            print(f"Erro em prog2: {e}")
+            print("Reiniciando o loop de conexão...")
+            time.sleep(2)
 
 if __name__ == "__main__":
     main()
