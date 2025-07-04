@@ -40,8 +40,16 @@ Passo 1: Baixar as imagens Docker do Docker Hub
 
 Se você preferir usar as imagens já disponíveis no Docker Hub, basta executar:
 
+Na Máquina 1:
+
 docker pull mestrekan/prog1-image
+
+Na Máquina 2:
+
 docker pull mestrekan/prog2-image
+
+Na Máquina 3:
+
 docker pull mestrekan/prog3-image
 
 ---
